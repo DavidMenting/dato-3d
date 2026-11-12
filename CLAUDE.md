@@ -92,6 +92,8 @@ All files were copied from `dato-production-tests` at commit **e728a8d** ("DUO: 
 - **GLB frame:** x = SVG x, z = SVG y, Y up. Crush is at −x and Repeat/Tempo at −z, because that is where `faceplate.svg` has them (the doc says "Crush = SVG top"; the SVG wins so `dir` vectors in controls.js port unchanged). The lettering reads upright from the −z side, where the default camera sits.
 - **Numbering quirk:** the SVG numbers pads TR=1, BR=2, BL=3, TL=4 but pitch sliders TL=1, TR=2, BR=3, BL=4. controls.js compensates (CC 21 → `pitch-slider-2`, beside `drumpad-1`).
 - **Pitch sliders:** slot 27 mm, lever 7 mm, travel capped at the pot's ±10 mm (SVG says ±8.5). The `dir` vectors in controls.js point toward the centre (CC 127 = inner end), although the comment there and the doc say "outer". The numbers win for now: `pitch_cc127_inward`.
+- **Knobs:** the shaft's marker slot and groove are painted white. The CAD has both pots at −132° (near the minimum stop); `rest` in motion.json records that, so CC 64 points the marker toward the device centre ("up" for someone reading the label).
+- **Swing switch:** the CAD has the lever at an end detent, 1.94 mm off the centre of its 11 mm cutout. motion.json's min…max are offsets from that pose, centred on the cutout, ±2 mm.
 - The viewer never relies on GLB node origins (meshopt quantisation rewrites node transforms); it uses `pivot` from motion.json.
 
 ## Firmware facts that need new viewer logic

@@ -83,14 +83,27 @@ DRUM = dict(
 
     # Motion
     knob_range_deg=(-140.0, 140.0),   # 280° pots
-    knob_rest_deg=0.0,                # angle the CAD pose represents (verify on device)
+    # The angle the CAD pose represents is read off the shaft's marker: at 0°
+    # (CC 64) the marker points "up" for someone reading the knob's label, which
+    # for both DRUM knobs is toward the device centre.
+    knob_up_toward_centre=True,
+    knob_rest_deg_fallback=0.0,       # if no marker is found
     # controls.js dir vectors all point toward the device centre (comment there
     # says "outward"; the numbers were checked on the device, so they win).
     pitch_cc127_inward=True,
     pitch_rated_travel_mm=20.0,       # SL20V3: 20 mm slide pot; caps the slot measurement
     pitch_svg_travel_units=84.85,     # ± travel in controls.js, for the cross-check
+    # The pot shaft has a radial slot in its top that runs on as a groove down
+    # the side; on the real part it is filled white (like the slide-pot levers).
+    # Slot floor: faces pointing up, this far below the shaft top. Groove: faces
+    # pointing outward, recessed from the shaft's outer radius, near the slot's
+    # azimuth, down to max_depth.
+    knob_marker=dict(floor_depth_mm=(0.1, 1.0), recess_mm=0.05, azimuth_deg=15.0, max_depth_mm=4.0),
     swing_dir_svg=(0, 1),             # controls.js dir for CC 9
-    swing_travel_mm=2.5,              # ± (SVG says ±25 units); 3 detents
+    swing_travel_mm=2.0,              # ± between the outer detents; the CAD's end detent sits 1.94 mm off centre (SVG says ±2.5)
+    # The CAD has the lever at an end detent. The cutout in the faceplate gives
+    # the centre and the room: search this far around the lever for its edges.
+    swing_cutout_search_mm=(3.5, 9.0),   # across, along
     swing_lever_min_z_above_plate_mm=1.0,
     press_mm={'effect': 0.75, 'pad': 0.5, 'select': 0.5, 'play': 0.5, 'step': 0.3},  # guesses, halved 2026-11-12 (David: too deep)
     lit_roles=('step', 'pad', 'play'),
@@ -378,13 +391,50 @@ for k in range(len(steps) // n_ring):
         register(f'step-{i:02d}', p, 'press', DOWN, 0.0, press('step'), 'm', lit=True, ring=k)
         i += 1
 
+def paint_knob_marker(p):
+    k = C['knob_marker']
+    me, cx, cy, top = p['obj'].data, p['c'].x, p['c'].y, p['hi'].z
+    polar = lambda v: (math.hypot(v.x - cx, v.y - cy), math.atan2(v.y - cy, v.x - cx), top - v.z)
+    r_out = max(polar(v.co)[0] for v in me.vertices if top - v.co.z < k['max_depth_mm'] * MM)
+    lo, hi = (d * MM for d in k['floor_depth_mm'])
+    floor = [f for f in me.polygons if f.normal.z > 0.9 and lo < top - f.center.z < hi]
+    if not floor:
+        notes.append(f"{p['obj'].name}: no marker slot found in the shaft top")
+        return None
+    az = math.atan2(sum(math.sin(polar(f.center)[1]) for f in floor), sum(math.cos(polar(f.center)[1]) for f in floor))
+    near = lambda a: abs((a - az + math.pi) % (2 * math.pi) - math.pi) < math.radians(k['azimuth_deg'])
+    groove = []
+    for f in me.polygons:
+        r, a, d = polar(f.center)
+        radial = (f.normal.x * math.cos(a) + f.normal.y * math.sin(a))
+        r_max = max(polar(me.vertices[i].co)[0] for i in f.vertices)
+        if radial > 0.9 and near(a) and lo < d < k['max_depth_mm'] * MM and r_max < r_out - k['recess_mm'] * MM:
+            groove.append(f)
+    me.materials.append(PAL['white'])
+    for f in floor + groove:
+        f.material_index = len(me.materials) - 1
+    area = sum(f.area for f in floor + groove) / MM ** 2
+    # Clockwise angle (seen from above) from label-up to the marker, in SVG axes.
+    vx, vy = math.cos(az), -math.sin(az)
+    s = 1 if C['knob_up_toward_centre'] else -1
+    ux, uy = -s * p['sx'], -s * p['sy']
+    rest = math.degrees(math.atan2(ux * vy - uy * vx, ux * vx + uy * vy))
+    log(f"knob marker: {len(floor)} floor + {len(groove)} groove faces, {area:.1f} mm², CAD pose = {rest:+.0f}°")
+    return rest
+
+
 # knobs: pivot on the shaft axis (bbox centre of a cylinder)
 for p in by_role('knob'):
     paint(p)
+    rest = paint_knob_marker(p)
+    if rest is None:
+        rest = C['knob_rest_deg_fallback']
     lo_deg, hi_deg = C['knob_range_deg']
+    if not lo_deg - 5 <= rest <= hi_deg + 5:
+        notes.append(f"knob at svg ({p['sx']:+.0f}, {p['sy']:+.0f}): CAD pose {rest:+.0f}° is outside the pot's range")
     # axis −Y: positive angles turn clockwise seen from above
     register(C['knob_ids'](p['sx'], p['sy']), p, 'rotate', DOWN, lo_deg, hi_deg, 'deg',
-             rest=C['knob_rest_deg'])
+             rest=round(rest, 1))
 
 
 def extent_along(verts, origin, u):
@@ -426,8 +476,30 @@ for p in by_role('pitch'):
 # swing switch lever
 for p in by_role('swing'):
     paint(p)
-    t = round(C['swing_travel_mm'] * MM, 6)
-    register('slider-swing', p, 'translate', svg_dir_to_glb(*C['swing_dir_svg']), -t, t, 'm')
+    dx, dy = C['swing_dir_svg']
+    u = Vector((dx, -dy, 0)).normalized()                      # SVG dir in Blender space
+    w = Vector((-u.y, u.x, 0))
+    across, along = (d * MM for d in C['swing_cutout_search_mm'])
+    lever = [v.co for v in p['obj'].data.vertices if v.co.z > plate_top]
+    lc = Vector((sum(v.x for v in lever) / len(lever), sum(v.y for v in lever) / len(lever), 0))
+    l0, l1 = extent_along(lever, lc, u)
+    edge = [v for v in plate_top_verts
+            if abs((v.x - lc.x) * w.x + (v.y - lc.y) * w.y) < across
+            and abs((v.x - lc.x) * u.x + (v.y - lc.y) * u.y) < along]
+    t = C['swing_travel_mm']
+    off = 0.0
+    if edge:
+        c0, c1 = extent_along(edge, lc, u)
+        room = ((c1 - c0) - (l1 - l0)) / 2 / MM
+        off = ((l0 + l1) / 2 - (c0 + c1) / 2) / MM             # lever centre − cutout centre, along dir
+        t = min(t, room)
+        log(f'swing: cutout {(c1 - c0) / MM:.1f} mm, lever {(l1 - l0) / MM:.1f} mm, room ±{room:.2f} mm, '
+            f'CAD pose {off:+.2f} mm from centre → travel ±{t:.2f} mm')
+    else:
+        notes.append('swing: cutout not found in the faceplate, lever not centred')
+    # min…max are offsets from the CAD pose; their midpoint is the cutout centre.
+    register('slider-swing', p, 'translate', svg_dir_to_glb(dx, dy),
+             round((-t - off) * MM, 6), round((t - off) * MM, 6), 'm')
 
 # ---- statics: paint, then merge into one mesh (one primitive per material) ----
 statics = [p for p in parts if p['obj'].name not in named or named.get(p['obj'].name) is not p]
