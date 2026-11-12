@@ -5,7 +5,7 @@ annotate-3d.py — pass 2 of the CAD pipeline (pass 1 is inspect.py).
 
 Turns the raw Fusion FBX into build/<product>.glb + build/<product>-motion.json:
 normalise, recognise parts, name them with the control IDs from controls.js,
-set pivots, measure travel, strip internals, merge statics, flat palette
+set pivots, measure travel, strip small internals, merge statics, flat palette
 materials. Prints an OK / MISSING / EXTRA checklist against controls.js.
 
 EVERY assumption about the CAD lives in the constants below. When the hardware
@@ -47,8 +47,18 @@ DRUM = dict(
         (r'Onderkant DRUM',               'case'),
         (r'Feet ',                        'feet'),
         (r'Screw ISO 7380',               'case'),      # two black screws in the rim
+        # Internals: static, seen through the slider slots, knob holes, connector
+        # openings and gaps when the camera orbits. (The moving shafts and levers
+        # matched above; these are the bodies they sit in.)
+        (r'Potentiometer_Song-Huei',      'potbody'),   # rotary + slide pot cans
+        (r'_PCB',                         'pcb'),       # both boards, bare
+        (r'DIN-5|TYPE-C|SW-SMD|TE-2-1734248|TE_2-84952', 'internal'),  # MIDI, USB-C, power switch, board-to-board
+        (r'Jack_3\.5mm',                  'jack'),
+        (r'Sufr4004',                     'internal'),  # speaker
+        (r'Spacer 2|Trapesium refelt',    'spacer'),
+        (r'Flachkopfschraube|Senkschraube', 'metal'),
     ],
-    # Everything else (both PCBs, speaker, spacer, screws inside) is stripped.
+    # Everything else (SMD parts, LEDs, tact switches: small and out of sight) is stripped.
 
     # Fusion appearance → palette entry, per role. '*' is the role's default.
     materials={
@@ -64,6 +74,12 @@ DRUM = dict(
         'felt':      {'*': 'felt'},
         'case':      {'*': 'case'},
         'feet':      {'*': 'case'},
+        'potbody':   {'*': 'metal'},
+        'pcb':       {'*': 'pcb'},
+        'internal':  {'Steel - Satin': 'metal', '*': 'dark'},   # also the swing switch body
+        'jack':      {'*': 'dark'},
+        'spacer':    {'*': 'case'},
+        'metal':     {'*': 'metal'},
     },
     effect_colours={'btn-crush': 'green', 'btn-random': 'yellow', 'btn-repeat': 'red', 'btn-filter': 'blue'},
 
@@ -120,6 +136,8 @@ PALETTE = {
     'knob':     '#1e1e20',
     'case':     '#232325',
     'felt':     '#9fcfb9',
+    'metal':    '#b4b7bb',
+    'pcb':      '#2f6b52',
     'green':    '#35c46b',
     'yellow':   '#ffd02e',
     'red':      '#ff4a3d',
@@ -253,8 +271,8 @@ for p in by_role('swing'):
     if lever and rest:
         join(lever[0], lever[1:])
         parts.append({'obj': lever[0], 'role': 'swing'})
-        for o in rest:   # switch body sits under the plate
-            bpy.data.objects.remove(o, do_unlink=True)
+        join(rest[0], rest[1:])   # switch body: stays put under the plate
+        parts.append({'obj': rest[0], 'role': 'internal'})
     else:
         join(pieces[0], pieces[1:])
         parts.append({'obj': pieces[0], 'role': 'swing'})
@@ -538,7 +556,7 @@ if PRODUCT == 'drum':
 else:
     no_part = {}
 
-print('\n=== removed (not visible from outside) ===')
+print('\n=== removed (small parts, out of sight) ===')
 for k, v in sorted(removed.items(), key=lambda kv: -kv[1]):
     print(f'  {v:4d} × {k}')
 print('\n=== checklist ===')

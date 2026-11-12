@@ -32,7 +32,7 @@ npm's default cache (`~/.npm`) is not writable in the Claude Code sandbox. Use `
 |---|------|------|--------|
 | 1 | Toon exports each assembly (Fusion 360) | — | `drum.fbx`, `duo.fbx` (+ `.step` backups) |
 | 2 | Inspect: every body's name, bbox (mm), centroid, verts, colour | `blender -b -P scripts/inspect.py` | `<product>-parts.json`, numbered top + 3/4 contact sheet |
-| 3 | Annotate: normalise (metres, Y-up, Crush / synth half to −Z), recognise parts, name them with the SVG IDs, set pivots, measure travel, strip hidden parts, merge statics, flat materials, faceplate print | `blender -b -P scripts/annotate-3d.py` | `<product>.glb`, `<product>-motion.json`, OK/MISSING/EXTRA checklist |
+| 3 | Annotate: normalise (metres, Y-up, Crush / synth half to −Z), recognise parts, name them with the SVG IDs, set pivots, measure travel, strip small SMD parts, merge statics, flat materials, faceplate print | `blender -b -P scripts/annotate-3d.py` | `<product>.glb`, `<product>-motion.json`, OK/MISSING/EXTRA checklist |
 | 4 | Optimise | `gltf-transform` | compressed GLB in `public/models/` |
 | 5 | Viewer | three.js + Vite | the app |
 | 6 | Check against the real device, fix constants in step 3 | browser + device | updated `annotate-3d.py` |
@@ -86,7 +86,7 @@ All files were copied from `dato-production-tests` at commit **e728a8d** ("DUO: 
 ## What the DRUM CAD contains (inspect, 2026-11-12)
 
 - 1196 bodies, 196 × 196 × 55.5 mm, metres, Z up. Body names are generic; the Fusion component path is readable (`seq knop`, `Drumpad`, `Effect knop`, `play knop`, `sample driehoke knopjje`, `Faceplate DRUM`, `basis silicone`, `Refelt`, `Onderkant`). Roles are matched on that path.
-- Both PCBs (`DRUM-Pizza`, `DRUM-Submarine`, about 1000 bodies), speaker, spacer and inner screws are stripped.
+- Internals are kept as static parts so the device isn't hollow when the camera orbits: pot and slide-pot bodies, swing switch body, connectors (DIN-5, jack, USB-C, power switch, board-to-board), both bare PCBs, speaker, spacer and inner screws (palette `metal`, `pcb`, `dark`). Only the small SMD parts, LEDs and tact switches (about 490 bodies) are stripped.
 - The faceplate print is modelled as 95 thin bodies, so no texture decal is needed. Pad tops and icons are thin bodies too; they are joined to their pad.
 - No knob caps and no slider caps: the pot shafts (`20kq`) and slide-pot levers (`SLXXV3-10D`) are the visible parts. The swing switch is one connected mesh, so the whole switch moves under the plate.
 - Fusion appearances carry no colours for the effect buttons or triangles; the palette in `annotate-3d.py` sets them (green/yellow/red/blue, dark triangles).
