@@ -1,0 +1,13 @@
+@font-face {
+  font-family: 'Sailec-Medium';
+  src: url('./webfonts/sailec-medium.woff2') format('woff2');
+  font-display: swap;
+}
+
+html, body { margin: 0; height: 100%; overflow: hidden; }
+#scene { display: block; width: 100vw; height: 100vh; }
+#status {
+  position: fixed; left: 16px; bottom: 16px;
+  font-family: var(--font-base);
+  font-size: 14px; opacity: 0.6;
+}
