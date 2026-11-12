@@ -14,6 +14,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BACKGROUND, addLights } from './viewer/look.js';
 import { loadModel } from './viewer/model.js';
 import { createTweaks } from './viewer/tweaks.js';
+import { createStage } from './viewer/stage.js';
 import { initMIDI } from './shared/midi.js';
 import { DRUM } from './drum/device.js';
 import { createDrumLive } from './drum/live.js';
@@ -45,7 +46,9 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  stage?.resize();
 }
+let stage = null;
 window.addEventListener('resize', resize);
 resize();
 
@@ -53,8 +56,9 @@ const model = await loadModel('drum');
 scene.add(model.root);
 const live = createDrumLive(model);
 const demo = createDrumDemo();
-const tweaks = createTweaks({ model, scene, lights });
-window.viewer = { model, live, demo, scene, camera, tweaks };
+stage = createStage({ renderer, scene, camera, lights, model });
+const tweaks = createTweaks({ model, scene, lights, stage });
+window.viewer = { model, live, demo, scene, camera, tweaks, stage, renderer };
 
 // A real device takes over from the demo; unplugging brings the demo back,
 // unless the demo is switched off (button, D key, or ?demo=0). The choice is
@@ -108,5 +112,5 @@ renderer.setAnimationLoop(time => {
   live.update(time);
   model.update(dt);
   orbit.update();
-  renderer.render(scene, camera);
+  stage.render();
 });

@@ -113,7 +113,7 @@ export class Model {
     for (const mesh of this.meshes) {
       const old = mesh.material;
       if (!swap.has(old)) {
-        const mat = makeMaterial(old.color, look);
+        const mat = makeMaterial(old.color, look, old.name);
         mat.name = old.name;
         mat.userData = old.userData;
         mat.emissive.copy(old.emissive);

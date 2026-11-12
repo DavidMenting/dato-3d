@@ -1,18 +1,20 @@
 /**
  * tweaks.js
  * A small lil-gui panel to play with the look live: shader, toon bands, lights,
- * LED glow, background. Settings are kept in localStorage; "Copy settings"
+ * LED glow, background, and the photo options (reflections, tone mapping,
+ * shadow, ambient occlusion). "Photo preset" switches them all on; Reset goes
+ * back to the toon look. Settings are kept in localStorage; "Copy settings"
  * puts JSON on the clipboard to paste into LOOK_DEFAULTS in look.js.
  * H hides all on-screen UI (for clean captures).
  */
 
 import * as THREE from 'three';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
-import { LOOK_DEFAULTS, setToonGradient, aimKey } from './look.js';
+import { LOOK_DEFAULTS, PHOTO_PRESET, setToonGradient, aimKey, pbrOf } from './look.js';
 
 const KEY = 'dato-3d.look';
 
-export function createTweaks({ model, scene, lights }) {
+export function createTweaks({ model, scene, lights, stage }) {
   const look = { ...LOOK_DEFAULTS, ...load() };
   const gui = new GUI({ title: 'Look' });
   gui.close();
@@ -22,7 +24,10 @@ export function createTweaks({ model, scene, lights }) {
     const tex = setToonGradient(look.toonSteps, look.toonShadow);
     model.eachMaterial(m => { if (m.isMeshToonMaterial) { m.gradientMap = tex; } });
   };
-  const applyRoughness = () => model.eachMaterial(m => { if (m.isMeshStandardMaterial) m.roughness = look.roughness; });
+  const applyRoughness = () => model.eachMaterial(m => {
+    if (m.isMeshStandardMaterial) m.roughness = Math.min(1, pbrOf(m.name).roughness * look.roughnessScale);
+  });
+  const applyStage = () => stage.apply(look);
   const applyLights = () => {
     lights.key.intensity = look.keyIntensity;
     lights.hemi.intensity = look.ambient;
@@ -31,6 +36,7 @@ export function createTweaks({ model, scene, lights }) {
   const applyAll = () => {
     applyShader();
     applyLights();
+    applyStage();
     model.ledGlow = look.ledGlow;
     scene.background = new THREE.Color(look.background);
   };
@@ -40,7 +46,19 @@ export function createTweaks({ model, scene, lights }) {
   const toon = gui.addFolder('Toon');
   toon.add(look, 'toonSteps', 2, 6, 1).name('Bands').onChange(on(applyToon));
   toon.add(look, 'toonShadow', 0, 1, 0.01).name('Shadow level').onChange(on(applyToon));
-  gui.add(look, 'roughness', 0, 1, 0.01).name('Roughness (PBR)').onChange(on(applyRoughness));
+  const pbr = gui.addFolder('PBR');
+  pbr.add(look, 'roughnessScale', 0, 2, 0.01).name('Roughness ×').onChange(on(applyRoughness));
+  pbr.add(look, 'envIntensity', 0, 3, 0.05).name('Reflections').onChange(on(applyStage));
+  const tone = gui.addFolder('Tone');
+  tone.add(look, 'toneMapping', { None: 'none', AgX: 'agx', ACES: 'aces', Neutral: 'neutral' }).name('Tone mapping').onChange(on(applyStage));
+  tone.add(look, 'exposure', 0.3, 3, 0.01).name('Exposure').onChange(on(applyStage));
+  const shade = gui.addFolder('Shadow + occlusion');
+  shade.add(look, 'shadows').name('Shadow').onChange(on(applyStage));
+  shade.add(look, 'shadowSoftness', 0, 12, 0.1).name('Softness').onChange(on(applyStage));
+  shade.add(look, 'shadowOpacity', 0, 1, 0.01).name('Floor shadow').onChange(on(applyStage));
+  shade.add(look, 'ao').name('Ambient occlusion').onChange(on(applyStage));
+  shade.add(look, 'aoIntensity', 0, 2, 0.01).name('AO strength').onChange(on(applyStage));
+  shade.add(look, 'aoRadiusMm', 1, 30, 0.5).name('AO radius (mm)').onChange(on(applyStage));
   const light = gui.addFolder('Light');
   light.add(look, 'keyIntensity', 0, 5, 0.05).name('Key').onChange(on(applyLights));
   light.add(look, 'keyAzimuth', -180, 180, 1).name('Key direction').onChange(on(applyLights));
@@ -56,14 +74,14 @@ export function createTweaks({ model, scene, lights }) {
       console.log('Look settings:\n' + text);
     },
   }, 'copy').name('Copy settings');
-  gui.add({
-    reset() {
-      Object.assign(look, LOOK_DEFAULTS);
-      save(null);
-      gui.controllersRecursive().forEach(c => c.updateDisplay());
-      applyAll();
-    },
-  }, 'reset').name('Reset');
+  const preset = (values, keep) => () => {
+    Object.assign(look, LOOK_DEFAULTS, values);
+    save(keep ? look : null);
+    gui.controllersRecursive().forEach(c => c.updateDisplay());
+    applyAll();
+  };
+  gui.add({ photo: preset(PHOTO_PRESET, true) }, 'photo').name('Photo preset');
+  gui.add({ reset: preset({}, false) }, 'reset').name('Reset (toon)');
 
   applyAll();
   return { gui, look };

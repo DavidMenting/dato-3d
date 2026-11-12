@@ -22,7 +22,7 @@ npm's default cache (`~/.npm`) is not writable in the Claude Code sandbox. Use `
 
 - **MIDI in only.** The viewer sends nothing to the device, apart from the connect handshake kept from `device.js` (see Gotchas).
 - **Map direct values directly** (CCs, notes, clock). Fake inferred state plausibly, or leave it out. Verify device details only when a shot visibly looks wrong.
-- **Look:** clean and stylised. `MeshToonMaterial` with a 3-step gradient, flat palette colours, no outlines (David removed the inverted hull on 2026-11-12), no post-processing, one key light plus one hemisphere light, OrbitControls, plain background. Lit parts switch their emissive colour. Add things only when they're needed, in this order: faceplate print decal, soft contact shadow, felt/plywood textures, LED bloom.
+- **Look:** clean and stylised. `MeshToonMaterial` with a 3-step gradient, flat palette colours, no outlines (David removed the inverted hull on 2026-11-12), no post-processing, one key light plus one hemisphere light, OrbitControls, plain background. Lit parts switch their emissive colour. A second, opt-in "Photo preset" in the Look panel (added 2026-11-12) switches to PBR materials with per-part roughness/metalness (`PBR` in `look.js`), studio reflections, tone mapping, a soft shadow and ambient occlusion; toon stays the default. Add things only when they're needed, in this order: faceplate print decal, soft contact shadow, felt/plywood textures, LED bloom.
 - **Target fast machines.** For weak hardware or the website, render to video (record MIDI → replay → capture) instead of tuning down the scene.
 - **All CAD assumptions live in `annotate-3d.py`** (part names, pivots, travel), as named constants at the top. When the hardware disagrees, change a constant and re-run. Don't hand-edit the GLB.
 
@@ -48,6 +48,7 @@ src/
   main.js              scene, camera, wiring: model + live + demo + MIDI
   viewer/model.js      loads GLB + motion.json; model.set(id, 0…1) moves, model.light(id, colour, level) lights. Knows no MIDI
   viewer/look.js       LOOK_DEFAULTS (the shipped look), materials (toon / lambert / standard), lights
+  viewer/stage.js      optional photo look: studio environment, tone mapping, soft shadow + floor, GTAO. Off by default
   viewer/tweaks.js     lil-gui "Look" panel (top right) edits the look live; kept in localStorage; H hides all UI
   drum/live.js         midi-* events → model (port of visualizer.js) + inferred play state / playhead + Filter/Crush LED effects
   drum/demo.js         fake performance, dispatches the same events as a device
