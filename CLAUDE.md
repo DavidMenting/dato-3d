@@ -12,7 +12,7 @@ npm run build
 scripts/build-model.sh drum "cad/Dato+DRUM+1.0.fbx"   # pipeline steps 3+4 → public/models/
 ```
 
-With no device plugged in, the viewer plays a fake performance (`src/drum/demo.js`) through the same `midi-*` events a real DRUM sends. A real device takes over on connect.
+With no device plugged in, the viewer plays a fake performance (`src/drum/demo.js`) through the same `midi-*` events a real DRUM sends. A real device takes over on connect. The Demo button (bottom right) or the D key switches the demo off; the choice is kept in localStorage, and `?demo=` overrides it.
 
 Claude's sandboxed shell can neither listen on a port nor reach localhost. David runs `npm run dev`; Claude checks the page through the Chrome DevTools MCP tools (`http://localhost:5173/?midi=0`), which is a good job for a Sonnet subagent. The sandbox also has no GPU (Blender Workbench/EEVEE fail; Cycles on CPU works). Without a browser, check the model with `blender -b --factory-startup -P scripts/preview.py -- drum` (→ `build/drum-preview.png`).
 
@@ -47,7 +47,8 @@ Key motion conventions: knobs map CC 0→127 to −140°…+140° (280° pots; t
 src/
   main.js              scene, camera, wiring: model + live + demo + MIDI
   viewer/model.js      loads GLB + motion.json; model.set(id, 0…1) moves, model.light(id, colour, level) lights. Knows no MIDI
-  viewer/look.js       toon material, lights
+  viewer/look.js       LOOK_DEFAULTS (the shipped look), materials (toon / lambert / standard), lights
+  viewer/tweaks.js     lil-gui "Look" panel (top right) edits the look live; kept in localStorage; H hides all UI
   drum/live.js         midi-* events → model (port of visualizer.js) + inferred play state / playhead + Filter/Crush LED effects
   drum/demo.js         fake performance, dispatches the same events as a device
   shared/midi.js       Web MIDI, typed midi-* CustomEvents on document, device profiles, autodetect  [copied as is]

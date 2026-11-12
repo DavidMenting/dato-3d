@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { toonMaterial } from './look.js';
+import { toonMaterial, makeMaterial, LOOK_DEFAULTS } from './look.js';
 
 // Pot hysteresis sends steps of 2: smooth over about 30 ms so moves don't look stepped.
 const SMOOTH_MS = 30;
@@ -23,7 +23,6 @@ const LIT_MATERIAL = 'silicone';
 // The tint saturates early (a half-bright LED still reads as its colour, not
 // as a pastel); the glow carries the brightness.
 const ledTint = level => 1 - (1 - level) ** 3;
-const LED_GLOW = 0.35;
 
 export async function loadModel(product, base = `${import.meta.env.BASE_URL}models/`) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -38,6 +37,7 @@ export class Model {
   constructor(root, motion) {
     this.root = root;
     this.controls = new Map();
+    this.ledGlow = LOOK_DEFAULTS.ledGlow;
     root.updateMatrixWorld(true);
 
     const motionById = new Map(motion.controls.map(m => [m.id, m]));
@@ -46,6 +46,7 @@ export class Model {
     // Collect first: we re-parent while wiring up.
     const meshes = [];
     root.traverse(o => { if (o.isMesh) meshes.push(o); });
+    this.meshes = meshes;
 
     for (const mesh of meshes) {
       const owner = ownerId(mesh, motionById);
@@ -102,8 +103,33 @@ export class Model {
     if (!c?.litMats) return;
     for (const mat of c.litMats) {
       mat.color.lerpColors(mat.userData.base, color, ledTint(level));
-      mat.emissive.copy(color).multiplyScalar(level * LED_GLOW);
+      mat.emissive.copy(color).multiplyScalar(level * this.ledGlow);
     }
+  }
+
+  /** Swap every material for one from makeMaterial(color, look), keeping colours, LED state and sharing. */
+  restyle(look) {
+    const swap = new Map();
+    for (const mesh of this.meshes) {
+      const old = mesh.material;
+      if (!swap.has(old)) {
+        const mat = makeMaterial(old.color, look);
+        mat.name = old.name;
+        mat.userData = old.userData;
+        mat.emissive.copy(old.emissive);
+        swap.set(old, mat);
+      }
+      mesh.material = swap.get(old);
+    }
+    for (const c of this.controls.values()) {
+      if (c.litMats) c.litMats = c.litMats.map(m => swap.get(m) ?? m);
+    }
+    for (const old of swap.keys()) old.dispose();
+  }
+
+  /** Apply fn to each distinct material. */
+  eachMaterial(fn) {
+    new Set(this.meshes.map(m => m.material)).forEach(fn);
   }
 
   update(dtMs) {

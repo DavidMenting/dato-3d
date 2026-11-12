@@ -2,8 +2,9 @@
  * main.js
  * The viewer: scene + model + one product's live mapping.
  *
- *   ?demo=0   no fake performance while waiting for a device
+ *   ?demo=0   no fake performance while waiting for a device (also: Demo button, D key)
  *   ?midi=0   don't ask for MIDI access (demo only; nothing is sent anywhere)
+ *   H         hide all on-screen UI (Look panel, Demo button, status)
  *
  * window.viewer exposes { model, live, demo } for poking from the console.
  */
@@ -12,6 +13,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BACKGROUND, addLights } from './viewer/look.js';
 import { loadModel } from './viewer/model.js';
+import { createTweaks } from './viewer/tweaks.js';
 import { initMIDI } from './shared/midi.js';
 import { DRUM } from './drum/device.js';
 import { createDrumLive } from './drum/live.js';
@@ -26,7 +28,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(BACKGROUND);
-addLights(scene);
+const lights = addLights(scene);
 
 // The camera sits on the −Z side (the Repeat / Tempo side), where the
 // faceplate lettering reads upright.
@@ -51,17 +53,53 @@ const model = await loadModel('drum');
 scene.add(model.root);
 const live = createDrumLive(model);
 const demo = createDrumDemo();
-window.viewer = { model, live, demo, scene, camera };
+const tweaks = createTweaks({ model, scene, lights });
+window.viewer = { model, live, demo, scene, camera, tweaks };
 
-// A real device takes over from the demo; unplugging brings the demo back.
-const wantDemo = params.get('demo') !== '0';
-document.addEventListener('midi-connected', () => demo.stop());
-document.addEventListener('midi-disconnected', e => {
-  if (wantDemo && e.detail?.name !== 'demo') demo.start();
+// A real device takes over from the demo; unplugging brings the demo back,
+// unless the demo is switched off (button, D key, or ?demo=0). The choice is
+// remembered per browser; ?demo= in the URL overrides it.
+const DEMO_KEY = 'dato-3d.demo';
+const midiOn = params.get('midi') !== '0';
+const demoBtn = document.getElementById('demo-toggle');
+let deviceConnected = false;
+let wantDemo = params.has('demo') ? params.get('demo') !== '0' : readDemoPref();
+
+function readDemoPref() {
+  try { return localStorage.getItem(DEMO_KEY) !== '0'; } catch { return true; }
+}
+
+function syncDemo() {
+  if (wantDemo && !deviceConnected) demo.start();
+  else demo.stop();
+  demoBtn.textContent = wantDemo ? 'Demo on' : 'Demo off';
+  demoBtn.setAttribute('aria-pressed', String(wantDemo));
+  demoBtn.disabled = deviceConnected;
+  demoBtn.title = deviceConnected ? 'A device is connected' : 'Toggle the demo performance (D)';
+  if (!midiOn) statusEl.textContent = wantDemo ? 'Demo performance' : 'Demo off';
+}
+
+function setDemo(on) {
+  wantDemo = on;
+  try { localStorage.setItem(DEMO_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+  syncDemo();
+}
+
+demoBtn.addEventListener('click', () => setDemo(!wantDemo));
+window.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, select, textarea')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'd' && !deviceConnected) setDemo(!wantDemo);
+  if (k === 'h') document.body.classList.toggle('no-ui');   // clean frame for captures
 });
-if (wantDemo) demo.start();
-if (params.get('midi') !== '0') initMIDI(statusEl, DRUM);
-else statusEl.textContent = 'Demo performance';
+document.addEventListener('midi-connected', () => { deviceConnected = true; syncDemo(); });
+document.addEventListener('midi-disconnected', e => {
+  if (e.detail?.name === 'demo') return;
+  deviceConnected = false;
+  syncDemo();
+});
+syncDemo();
+if (midiOn) initMIDI(statusEl, DRUM);
 
 let last = performance.now();
 renderer.setAnimationLoop(time => {

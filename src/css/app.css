@@ -11,3 +11,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; }
   font-family: var(--font-base);
   font-size: 14px; opacity: 0.6;
 }
+
+#demo-toggle {
+  position: fixed; right: 16px; bottom: 16px;
+  font-family: var(--font-base); font-size: 14px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  opacity: 0.6; cursor: pointer;
+}
+#demo-toggle:hover:not(:disabled) { opacity: 1; }
+#demo-toggle[aria-pressed="false"] { opacity: 0.35; }
+#demo-toggle:disabled { opacity: 0.2; cursor: default; }
+
+body.no-ui #status, body.no-ui #demo-toggle, body.no-ui .lil-gui.root { display: none; }
