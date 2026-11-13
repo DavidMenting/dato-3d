@@ -34,6 +34,7 @@ export const LOOK_DEFAULTS = {
   ambient: 1.6,          // hemisphere light intensity
   ledGlow: 0.35,         // emissive strength of lit silicone at full level
   background: '#f4f4f2',
+  damping: true,         // camera keeps gliding after you let go of an orbit drag
 };
 
 /** Overrides on top of LOOK_DEFAULTS for the "Photo" preset button. */

@@ -1,7 +1,7 @@
 /**
  * tweaks.js
  * A small lil-gui panel to play with the look live: shader, toon bands, lights,
- * LED glow, background, and the photo options (reflections, tone mapping,
+ * LED glow, background, camera damping, and the photo options (reflections, tone mapping,
  * shadow, ambient occlusion). "Photo preset" switches them all on; Reset goes
  * back to the toon look. Settings are kept in localStorage; "Copy settings"
  * puts JSON on the clipboard to paste into LOOK_DEFAULTS in look.js.
@@ -14,7 +14,7 @@ import { LOOK_DEFAULTS, PHOTO_PRESET, setToonGradient, aimKey, pbrOf } from './l
 
 const KEY = 'dato-3d.look';
 
-export function createTweaks({ model, scene, lights, stage }) {
+export function createTweaks({ model, scene, lights, stage, orbit }) {
   const look = { ...LOOK_DEFAULTS, ...load() };
   const gui = new GUI({ title: 'Look' });
   gui.close();
@@ -39,6 +39,7 @@ export function createTweaks({ model, scene, lights, stage }) {
     applyStage();
     model.ledGlow = look.ledGlow;
     scene.background = new THREE.Color(look.background);
+    orbit.enableDamping = look.damping;
   };
 
   const on = fn => () => { fn(); save(look); };
@@ -66,6 +67,8 @@ export function createTweaks({ model, scene, lights, stage }) {
   light.add(look, 'ambient', 0, 5, 0.05).name('Ambient').onChange(on(applyLights));
   gui.add(look, 'ledGlow', 0, 1.5, 0.01).name('LED glow').onChange(on(() => { model.ledGlow = look.ledGlow; }));
   gui.addColor(look, 'background').name('Background').onChange(on(() => { scene.background = new THREE.Color(look.background); }));
+
+  gui.add(look, 'damping').name('Camera damping').onChange(on(() => { orbit.enableDamping = look.damping; }));
 
   gui.add({
     copy() {

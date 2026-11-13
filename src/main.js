@@ -57,7 +57,7 @@ scene.add(model.root);
 const live = createDrumLive(model);
 const demo = createDrumDemo();
 stage = createStage({ renderer, scene, camera, lights, model });
-const tweaks = createTweaks({ model, scene, lights, stage });
+const tweaks = createTweaks({ model, scene, lights, stage, orbit });
 window.viewer = { model, live, demo, scene, camera, tweaks, stage, renderer };
 
 // A real device takes over from the demo; unplugging brings the demo back,
